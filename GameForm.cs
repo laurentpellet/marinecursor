@@ -10,6 +10,8 @@ namespace TetrisWinForms
         private const int Rows = 20;
         private const int CellSize = 24;
 
+        private static readonly System.Collections.Generic.Dictionary<Color, TextureBrush> TextureCache = new();
+
         private readonly Timer _timer;
         private readonly Color?[,] _board = new Color?[Columns, Rows];
 
@@ -319,17 +321,48 @@ namespace TetrisWinForms
         private static void DrawCell(Graphics g, int x, int y, Color color, int size = CellSize)
         {
             var rect = new Rectangle(x, y, size, size);
-            using var brush = new SolidBrush(color);
-            using var borderPen = new Pen(Color.FromArgb(20, 20, 20));
 
-            g.FillRectangle(brush, rect);
+            using var borderPen = new Pen(Color.FromArgb(20, 20, 20));
+            using var lightBrush = new SolidBrush(Color.FromArgb(80, Color.White));
+
+            using (var texture = GetTexture(color, size))
+            {
+                var oldTransform = texture.Transform;
+                texture.TranslateTransform(x, y);
+                g.FillRectangle(texture, rect);
+                texture.Transform = oldTransform;
+            }
+
             g.DrawRectangle(borderPen, rect);
 
-            // simple shine effect
-            using var lightBrush = new SolidBrush(Color.FromArgb(80, Color.White));
             var shine = new Rectangle(x + 2, y + 2, size - 4, size / 3);
             g.FillRectangle(lightBrush, shine);
         }
+
+        private static TextureBrush GetTexture(Color baseColor, int size)
+        {
+            if (TextureCache.TryGetValue(baseColor, out var cached))
+            {
+                return (TextureBrush)cached.Clone();
+            }
+
+            int texSize = Math.Max(8, size / 2);
+            var bmp = new Bitmap(texSize, texSize);
+
+            using (var g = Graphics.FromImage(bmp))
+            {
+                g.Clear(baseColor);
+
+                using var darkPen = new Pen(Color.FromArgb(80, Color.Black), 1);
+                using var lightPen = new Pen(Color.FromArgb(120, Color.White), 1);
+
+                g.DrawLine(darkPen, 0, texSize - 1, texSize - 1, 0);
+                g.DrawLine(lightPen, 0, 0, texSize - 1, texSize - 1);
+            }
+
+            var brush = new TextureBrush(bmp);
+            TextureCache[baseColor] = brush;
+            return (TextureBrush)brush.Clone();
+        }
     }
 }
-
